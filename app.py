@@ -197,7 +197,89 @@ class WebScrapingService:
             return WebScrapingService._fallback_trending()
     
     @staticmethod
-    def _fallback_trending():
+    def get_hacker_news_top():
+        """Get top stories from Hacker News."""
+        try:
+            fetcher = Fetcher()
+            response = fetcher.get('https://hacker-news.firebaseio.com/v0/topstories.json')
+            story_ids = response.json()[:20]
+            
+            stories = []
+            for sid in story_ids:
+                story_resp = fetcher.get(f'https://hacker-news.firebaseio.com/v0/item/{sid}.json')
+                story = story_resp.json()
+                if story and 'title' in story:
+                    stories.append({
+                        'title': story.get('title', ''),
+                        'url': story.get('url', ''),
+                        'points': story.get('points', 0),
+                        'comments': story.get('descendants', 0),
+                        'author': story.get('by', '')
+                    })
+            
+            return {'source': 'hn_api', 'stories': stories[:20]}
+        
+        except Exception as e:
+            print(f'Hacker News error: {e}')
+            return {'source': 'hn_fallback', 'stories': []}
+    
+    @staticmethod
+    def get_reddit_top(subreddit='programming', sort='hot', limit=25):
+        """Get top posts from Reddit."""
+        try:
+            fetcher = Fetcher()
+            url = f'https://www.reddit.com/r/{subreddit}/{sort}.json?limit={limit}'
+            response = fetcher.get(url, headers={
+                'User-Agent': 'SystemPulse/1.0'
+            })
+            
+            data = response.json()
+            posts = []
+            for post in data.get('data', {}).get('children', []):
+                pd = post.get('data', {})
+                posts.append({
+                    'title': pd.get('title', ''),
+                    'url': f'https://reddit.com{pd.get("url", "")}',
+                    'score': pd.get('score', 0),
+                    'comments': pd.get('num_comments', 0),
+                    'author': pd.get('author', ''),
+                    'subreddit': pd.get('subreddit', '')
+                })
+            
+            return {'source': 'reddit_api', 'posts': posts}
+        
+        except Exception as e:
+            print(f'Reddit error: {e}')
+            return {'source': 'reddit_fallback', 'posts': []}
+    
+    @staticmethod
+    def search_youtube(query, max_results=10):
+        """Search YouTube videos."""
+        try:
+            fetcher = Fetcher()
+            url = f'https://www.youtube.com/results?search_query={query.replace(" ", "+")}'
+            response = fetcher.get(url)
+            
+            videos = []
+            # Extract video IDs and titles from the page
+            video_pattern = r'"/watch\?v=([^&]+)"[^>]*>.*?<span[^>]*>([^<]+)</span>'
+            matches = re.findall(video_pattern, response.text, re.DOTALL)
+            
+            for video_id, title in matches[:max_results]:
+                videos.append({
+                    'title': title.strip(),
+                    'url': f'https://www.youtube.com/watch?v={video_id}',
+                    'video_id': video_id
+                })
+            
+            return {'source': 'youtube_search', 'videos': videos}
+        
+        except Exception as e:
+            print(f'YouTube error: {e}')
+            return {'source': 'youtube_fallback', 'videos': []}
+    
+    @staticmethod
+    def get_github_trending(language='python', since='daily'):
         """Fallback for trending repos."""
         return {
             'source': 'api_fallback',
@@ -293,6 +375,34 @@ def api_scrape(url):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/hackernews')
+def api_hackernews():
+    """Get top Hacker News stories."""
+    result = WebScrapingService.get_hacker_news_top()
+    return jsonify(result)
+
+
+@app.route('/api/reddit')
+def api_reddit():
+    """Get top Reddit posts."""
+    subreddit = request.args.get('subreddit', 'programming')
+    sort = request.args.get('sort', 'hot')
+    limit = request.args.get('limit', 25, type=int)
+    result = WebScrapingService.get_reddit_top(subreddit, sort, limit)
+    return jsonify(result)
+
+
+@app.route('/api/youtube')
+def api_youtube():
+    """Search YouTube videos."""
+    query = request.args.get('q', '')
+    max_results = request.args.get('limit', 10, type=int)
+    if not query:
+        return jsonify({'error': 'Query parameter q is required'}), 400
+    result = WebScrapingService.search_youtube(query, max_results)
+    return jsonify(result)
 
 
 # ===== WEB DASHBOARD =====
