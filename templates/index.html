@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Explorer</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --sidebar-bg: rgba(22, 27, 34, 0.95);
+            --card-bg: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --highlight: #1f6feb;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header-title h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+        }
+        
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .search-box {
+            padding: 6px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 13px;
+            width: 240px;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn:hover {
+            background: var(--bg);
+            border-color: var(--accent);
+        }
+        
+        .btn.active {
+            background: var(--highlight);
+            border-color: var(--highlight);
+            color: #fff;
+        }
+        
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        
+        .process-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        .process-table th {
+            background: var(--card-bg);
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .process-table th:hover {
+            color: var(--text);
+        }
+        
+        .process-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .process-table tr:hover {
+            background: rgba(88, 166, 255, 0.1);
+        }
+        
+        .process-table tr.selected {
+            background: rgba(88, 166, 255, 0.2);
+        }
+        
+        .tree-indent {
+            display: inline-block;
+        }
+        
+        .pid {
+            font-family: 'Courier New', monospace;
+            color: var(--accent);
+        }
+        
+        .name {
+            font-weight: 500;
+        }
+        
+        .cpu-bar {
+            width: 60px;
+            height: 6px;
+            background: var(--bg);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .cpu-fill {
+            height: 100%;
+            background: var(--success);
+            border-radius: 3px;
+        }
+        
+        .memory-bar {
+            width: 80px;
+            height: 6px;
+            background: var(--bg);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .memory-fill {
+            height: 100%;
+            background: var(--warning);
+            border-radius: 3px;
+        }
+        
+        .details-panel {
+            width: 360px;
+            background: var(--sidebar-bg);
+            border-left: 1px solid var(--border);
+            padding: 16px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .details-panel.active {
+            display: block;
+        }
+        
+        .details-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .details-header h3 {
+            font-size: 16px;
+            color: #fff;
+        }
+        
+        .detail-section {
+            margin-bottom: 16px;
+        }
+        
+        .detail-section h4 {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        .detail-item {
+            background: var(--bg);
+            padding: 8px 10px;
+            border-radius: 6px;
+        }
+        
+        .detail-label {
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+        
+        .detail-value {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-running {
+            background: rgba(63, 185, 80, 0.2);
+            color: var(--success);
+        }
+        
+        .badge-sleeping {
+            background: rgba(88, 166, 255, 0.2);
+            color: var(--accent);
+        }
+        
+        .badge-zombie {
+            background: rgba(248, 81, 73, 0.2);
+            color: var(--danger);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+        
+        .error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 12px;
+            border-radius: 6px;
+            margin: 16px;
+        }
+        
+        .tree-node {
+            display: flex;
+            align-items: center;
+            padding: 6px 0;
+            cursor: pointer;
+        }
+        
+        .tree-node:hover {
+            background: rgba(88, 166, 255, 0.1);
+        }
+        
+        .tree-children {
+            margin-left: 20px;
+            border-left: 1px solid var(--border);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .details-panel {
+                width: 100%;
+                height: 50%;
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+            
+            .stats {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#58a6ff"/>
+                <path d="M2 17L12 22L22 17" stroke="#58a6ff" stroke-width="2"/>
+                <path d="M2 12L12 17L22 12" stroke="#58a6ff" stroke-width="2"/>
+            </svg>
+            <h1>Process Explorer</h1>
+        </div>
+        <div class="stats">
+            <div class="stat-item">
+                <span>Processes:</span>
+                <span class="stat-value" id="process-count">-</span>
+            </div>
+            <div class="stat-item">
+                <span>Updated:</span>
+                <span class="stat-value" id="last-update">-</span>
+            </div>
+        </div>
+        <div class="controls">
+            <input type="text" class="search-box" placeholder="Search processes..." id="search-input">
+            <button class="btn" id="refresh-btn">Refresh</button>
+            <button class="btn" id="toggle-details">Details</button>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="main-content">
+            <div class="loading" id="loading">
+                <div>Loading processes...</div>
+            </div>
+            <table class="process-table" id="process-table" style="display: none;">
+                <thead>
+                    <tr>
+                        <th data-sort="pid">PID</th>
+                        <th data-sort="name">Name</th>
+                        <th data-sort="ppid">PPID</th>
+                        <th data-sort="state">State</th>
+                        <th data-sort="cpu">CPU %</th>
+                        <th data-sort="rss">Memory</th>
+                        <th>Threads</th>
+                    </tr>
+                </thead>
+                <tbody id="process-body">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="details-panel" id="details-panel">
+            <div class="details-header">
+                <h3>Process Details</h3>
+                <button class="btn" id="close-details">×</button>
+            </div>
+            <div id="details-content">
+                <div class="loading">Select a process to view details</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let processes = [];
+        let sortColumn = 'rss';
+        let sortDirection = 'desc';
+        let selectedProcess = null;
+        let searchTerm = '';
+        let refreshInterval = null;
+        
+        const processTable = document.getElementById('process-table');
+        const processBody = document.getElementById('process-body');
+        const loadingEl = document.getElementById('loading');
+        const detailsPanel = document.getElementById('details-panel');
+        const detailsContent = document.getElementById('details-content');
+        const searchInput = document.getElementById('search-input');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const toggleDetailsBtn = document.getElementById('toggle-details');
+        const closeDetailsBtn = document.getElementById('close-details');
+        
+        // Fetch process data
+        async function fetchProcesses() {
+            try {
+                const response = await fetch('/api/processes');
+                const data = await response.json();
+                processes = data.processes;
+                updateStats(data.count, data.timestamp);
+                renderProcesses();
+                loadingEl.style.display = 'none';
+                processTable.style.display = 'table';
+            } catch (error) {
+                console.error('Error fetching processes:', error);
+                loadingEl.innerHTML = '<div class="error">Failed to load processes</div>';
+            }
+        }
+        
+        // Update stats
+        function updateStats(count, timestamp) {
+            document.getElementById('process-count').textContent = count;
+            const date = new Date(timestamp * 1000);
+            document.getElementById('last-update').textContent = date.toLocaleTimeString();
+        }
+        
+        // Render process table
+        function renderProcesses() {
+            let filtered = processes;
+            if (searchTerm) {
+                filtered = processes.filter(p => 
+                    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    p.pid.toString().includes(searchTerm)
+                );
+            }
+            
+            // Sort processes
+            filtered.sort((a, b) => {
+                let aVal = a[sortColumn];
+                let bVal = b[sortColumn];
+                
+                // Handle different data types
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            processBody.innerHTML = '';
+            filtered.forEach(process => {
+                const row = document.createElement('tr');
+                row.className = selectedProcess && selectedProcess.pid === process.pid ? 'selected' : '';
+                row.innerHTML = `
+                    <td><span class="pid">${process.pid}</span></td>
+                    <td><span class="name">${process.name}</span></td>
+                    <td>${process.ppid}</td>
+                    <td>${getProcessStateBadge(process.state)}</td>
+                    <td>
+                        <div class="cpu-bar">
+                            <div class="cpu-fill" style="width: ${Math.min(process.cpu_pct || 0, 100)}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="memory-bar">
+                            <div class="memory-fill" style="width: ${process.memory_pct || 0}%"></div>
+                        </div>
+                        ${formatBytes(process.rss * 1024)}
+                    </td>
+                    <td>${process.threads || '-'}</td>
+                `;
+                row.addEventListener('click', () => selectProcess(process));
+                processBody.appendChild(row);
+            });
+        }
+        
+        // Get process state badge
+        function getProcessStateBadge(state) {
+            const stateMap = {
+                'R': { class: 'badge-running', text: 'Running' },
+                'S': { class: 'badge-sleeping', text: 'Sleeping' },
+                'Z': { class: 'badge-zombie', text: 'Zombie' },
+                'D': { class: 'badge-warning', text: 'Disk Sleep' },
+            };
+            
+            const stateInfo = stateMap[state] || { class: '', text: state };
+            return `<span class="badge ${stateInfo.class}">${stateInfo.text}</span>`;
+        }
+        
+        // Format bytes
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // Select process
+        async function selectProcess(process) {
+            selectedProcess = process;
+            renderProcesses();
+            showProcessDetails(process);
+        }
+        
+        // Show process details
+        async function showProcessDetails(process) {
+            detailsPanel.classList.add('active');
+            detailsContent.innerHTML = `
+                <div class="loading">Loading details...</div>
+            `;
+            
+            try {
+                const response = await fetch(`/api/processes`);
+                const data = await response.json();
+                const proc = data.processes.find(p => p.pid === process.pid);
+                
+                if (proc) {
+                    detailsContent.innerHTML = `
+                        <div class="detail-section">
+                            <h4>Process Information</h4>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">PID</div>
+                                    <div class="detail-value">${proc.pid}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Name</div>
+                                    <div class="detail-value">${proc.name}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Parent PID</div>
+                                    <div class="detail-value">${proc.ppid}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">State</div>
+                                    <div class="detail-value">${getProcessStateBadge(proc.state)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Resources</h4>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">Memory (RSS)</div>
+                                    <div class="detail-value">${formatBytes(proc.rss * 1024)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Virtual Memory</div>
+                                    <div class="detail-value">${formatBytes(proc.vsize)}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Threads</div>
+                                    <div class="detail-value">${proc.num_threads || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Nice Value</div>
+                                    <div class="detail-value">${proc.nice || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4>Advanced</h4>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">UID/GID</div>
+                                    <div class="detail-value">${proc.uid || '-'}/${proc.gid || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Session</div>
+                                    <div class="detail-value">${proc.session || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">TTY</div>
+                                    <div class="detail-value">${proc.tty || '-'}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Priority</div>
+                                    <div class="detail-value">${proc.priority || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                detailsContent.innerHTML = '<div class="error">Failed to load process details</div>';
+            }
+        }
+        
+        // Event listeners
+        searchInput.addEventListener('input', (e) => {
+            searchTerm = e.target.value;
+            renderProcesses();
+        });
+        
+        refreshBtn.addEventListener('click', fetchProcesses);
+        
+        toggleDetailsBtn.addEventListener('click', () => {
+            detailsPanel.classList.toggle('active');
+        });
+        
+        closeDetailsBtn.addEventListener('click', () => {
+            detailsPanel.classList.remove('active');
+        });
+        
+        // Sort columns
+        document.querySelectorAll('th[data-sort]').forEach(th => {
+            th.addEventListener('click', () => {
+                const column = th.dataset.sort;
+                if (sortColumn === column) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortColumn = column;
+                    sortDirection = 'desc';
+                }
+                renderProcesses();
+            });
+        });
+        
+        // Initialize
+        fetchProcesses();
+        
+        // Auto-refresh every 5 seconds
+        refreshInterval = setInterval(fetchProcesses, 5000);
+    </script>
+</body>
+</html>
