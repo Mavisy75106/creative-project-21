@@ -116,11 +116,93 @@ header p {
   margin-top: 10px;
 }
 .refresh-btn:hover { opacity: 0.8; }
+.news-list { list-style: none; }
+.news-list li {
+  padding: 12px 10px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.news-list li .news-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  display: block;
+  margin-bottom: 6px;
+  text-decoration: none;
+}
+.news-list li .news-title:hover { color: var(--accent); }
+.news-list li .news-meta {
+  color: var(--dim);
+  font-size: 12px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.youtube-list { list-style: none; }
+.youtube-list li {
+  padding: 12px 10px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.youtube-list li .yt-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  display: block;
+  margin-bottom: 6px;
+  text-decoration: none;
+}
+.youtube-list li .yt-title:hover { color: var(--accent); }
+.youtube-list li .yt-meta {
+  color: var(--dim);
+  font-size: 12px;
+}
 #last-update {
   text-align: center;
   color: var(--dim);
   font-size: 12px;
   margin-top: 20px;
+}
+.search-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.search-form input {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.search-form input:focus { border-color: var(--accent); }
+.search-form button {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.search-form button:hover { opacity: 0.8; }
+.subreddit-select {
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
 }
 </style>
 </head>
@@ -128,7 +210,7 @@ header p {
 <div class="container">
   <header>
     <h1>🔥 System Pulse</h1>
-    <p>Network System Monitor Dashboard powered by Scrapling</p>
+    <p>Network System Monitor Dashboard — 系統監控 + 網頁爬蟲</p>
   </header>
 
   <div class="grid">
@@ -179,6 +261,44 @@ header p {
       <button class="refresh-btn" onclick="fetchTrending()">刷新趨勢</button>
       <div id="trending-metrics" style="margin-top: 15px;">
         <p style="color: var(--dim); font-size: 13px;">點擊按鈕載入趨勢...</p>
+      </div>
+    </div>
+
+    <!-- Hacker News -->
+    <div class="card">
+      <h2>🦆 Hacker News</h2>
+      <button class="refresh-btn" onclick="fetchHackerNews()">載入熱門</button>
+      <div id="hn-metrics" style="margin-top: 15px;">
+        <p style="color: var(--dim); font-size: 13px;">點擊按鈕載入 HN 熱門...</p>
+      </div>
+    </div>
+
+    <!-- Reddit -->
+    <div class="card">
+      <h2>🤖 Reddit</h2>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <select class="subreddit-select" id="reddit-subreddit">
+          <option value="programming">programming</option>
+          <option value="python">python</option>
+          <option value="technology">technology</option>
+          <option value="webdev">webdev</option>
+        </select>
+        <button class="refresh-btn" onclick="fetchReddit()" style="margin-top: 0;">載入熱門</button>
+      </div>
+      <div id="reddit-metrics" style="margin-top: 15px;">
+        <p style="color: var(--dim); font-size: 13px;">選擇版區並點擊載入...</p>
+      </div>
+    </div>
+
+    <!-- YouTube -->
+    <div class="card">
+      <h2>🎬 YouTube 搜尋</h2>
+      <div class="search-form">
+        <input type="text" id="yt-search" placeholder="輸入搜尋關鍵字..." value="Python 3.13">
+        <button class="refresh-btn" onclick="searchYouTube()" style="margin-top: 0;">搜尋</button>
+      </div>
+      <div id="youtube-metrics" style="margin-top: 15px;">
+        <p style="color: var(--dim); font-size: 13px;">輸入關鍵字並點擊搜尋...</p>
       </div>
     </div>
   </div>
@@ -255,12 +375,12 @@ async function updateSystem() {
     if (data.network.length > 0) {
       let netHtml = '';
       data.network.forEach(nf => {
-        const rxMbps = (nf.rx_bytes / 1024 / 1024).toFixed(2);
-        const txMbps = (nf.tx_bytes / 1024 / 1024).toFixed(2);
+        const rxMB = (nf.rx_bytes / 1024 / 1024).toFixed(2);
+        const txMB = (nf.tx_bytes / 1024 / 1024).toFixed(2);
         netHtml += `
           <div class="metric">
             <span class="metric-label">${nf.interface}</span>
-            <span class="metric-value">↓${rxMbps} MB ↑${txMbps} MB</span>
+            <span class="metric-value">↓${rxMB} MB ↑${txMB} MB</span>
           </div>
         `;
       });
@@ -305,6 +425,66 @@ async function fetchTrending() {
   html += '</ul>';
   html += `<p style="color: var(--dim); font-size: 11px; margin-top: 8px;">來源：${data.source}</p>`;
   document.getElementById('trending-metrics').innerHTML = html;
+}
+
+async function fetchHackerNews() {
+  const res = await fetch('/api/hackernews');
+  const data = await res.json();
+  let html = '<ul class="news-list">';
+  data.stories.forEach(story => {
+    html += `<li>
+      <a class="news-title" href="${story.url}" target="_blank">${story.title}</a>
+      <div class="news-meta">
+        <span>👤 ${story.author}</span>
+        <span>👍 ${story.points}</span>
+        <span>💬 ${story.comments} 則留言</span>
+      </div>
+    </li>`;
+  });
+  html += '</ul>';
+  html += `<p style="color: var(--dim); font-size: 11px; margin-top: 8px;">來源：${data.source} — Hacker News Top Stories</p>`;
+  document.getElementById('hn-metrics').innerHTML = html;
+}
+
+async function fetchReddit() {
+  const subreddit = document.getElementById('reddit-subreddit').value;
+  const res = await fetch(`/api/reddit?subreddit=${subreddit}&limit=10`);
+  const data = await res.json();
+  let html = '<ul class="news-list">';
+  data.posts.forEach(post => {
+    html += `<li>
+      <a class="news-title" href="${post.url}" target="_blank">${post.title}</a>
+      <div class="news-meta">
+        <span>r/${post.subreddit}</span>
+        <span>👤 ${post.author}</span>
+        <span>👍 ${post.score}</span>
+        <span>💬 ${post.comments} 則留言</span>
+      </div>
+    </li>`;
+  });
+  html += '</ul>';
+  html += `<p style="color: var(--dim); font-size: 11px; margin-top: 8px;">來源：${data.source} — Reddit r/${subreddit} Hot</p>`;
+  document.getElementById('reddit-metrics').innerHTML = html;
+}
+
+async function searchYouTube() {
+  const query = document.getElementById('yt-search').value.trim();
+  if (!query) {
+    document.getElementById('youtube-metrics').innerHTML = '<p style="color: var(--yellow);">請輸入搜尋關鍵字</p>';
+    return;
+  }
+  const res = await fetch(`/api/youtube?q=${encodeURIComponent(query)}&limit=8`);
+  const data = await res.json();
+  let html = '<ul class="youtube-list">';
+  data.videos.forEach(video => {
+    html += `<li>
+      <a class="yt-title" href="${video.url}" target="_blank">${video.title}</a>
+      <div class="yt-meta">📺 YouTube 搜尋結果</div>
+    </li>`;
+  });
+  html += '</ul>';
+  html += `<p style="color: var(--dim); font-size: 11px; margin-top: 8px;">來源：${data.source} — 搜尋 "${query}"</p>`;
+  document.getElementById('youtube-metrics').innerHTML = html;
 }
 
 // Initial load
