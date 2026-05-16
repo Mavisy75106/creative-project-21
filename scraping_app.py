@@ -247,7 +247,7 @@ if __name__ == '__main__':
     print()
     
     basic_scrape()
-    asyncio.run(spider_example())
+    spider_example()
     benchmark()
     adaptive_parsing()
     health_checks()
